@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>&#x26A0;FULLSCREEN REQUIRED&#x26A0;</title>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="/functions/app.js"></script>
+    <script src="/functions/home.js"></script>
+    <script src="/functions/firebase.js"></script>
+    <script src="/functions/auth.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: black;
+            color: white;
+            font-family: Arial, Helvetica, sans-serif;
+            text-align: center;
+        }
+
+        #warning {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: black;
+            color: red;
+            font-size: 3em;
+            text-align: center;
+            padding-top: 20%;
+            z-index: 9999;
+        }
+
+        #content {
+            display: none;
+        }
+
+        #fullscreen-message {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            background: #ff0;
+            color: #000;
+            font-size: 1.5em;
+            z-index: 1000;
+        }
+
+        #camera-message {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            background: #ff0;
+            color: #000;
+            font-size: 1.5em;
+            z-index: 1000;
+        }
+
+        #header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: #111;
+            border-bottom: 1px solid #333;
+        }
+
+        #monitor-warning {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #ff4444;
+        }
+
+        #user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        #welcome-message {
+            font-size: 1.1em;
+        }
+
+        #user-name {
+            color: #4a90e2;
+            font-weight: bold;
+        }
+
+        #logout-btn {
+            background: transparent;
+            color: #ff4444;
+            border: 1px solid #ff4444;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        #logout-btn:hover {
+            background: #ff4444;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="header">
+        <div id="monitor-warning">THIS SCREEN IS MONITORED</div>
+        <div id="user-info">
+            <div id="welcome-message">Welcome, <span id="user-name">Loading...</span></div>
+            <button id="logout-btn">LOGOUT</button>
+        </div>
+    </div>
+    <!--<div id="camera-message">
+        &#x26A0;YOU MUST ENABLE CAMERA ACCESS TO CONTINUE&#x26A0;
+    </div>-->
+    <div id="fullscreen-message">
+        &#x26A0;YOU MUST ALLOW FULLSCREEN TO CONTINUE&#x26A0;
+    </div>
+    <div id="warning">
+        &#x26A0;TAB SWITCHING DETECTED&#x26A0; <br>
+        REFRESHING PAGE IMMEDIATELY!
+    </div>
+    <div id="content">
+        <h1>
+            &#x26A0; DO NOT SWITCH TABS &#x26A0;
+        </h1>
+        <iframe src="https://www.jdoodle.com/online-compiler-c++" width="100%" height="1000px"></iframe>
+    </div>
+</body>
+
+</html>
