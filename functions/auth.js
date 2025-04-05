@@ -1,11 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
-    // Your Firebase config should be in firebase.js
-    /*if (typeof firebase !== 'undefined') {
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-    }*/
-
-    function handleSignup() {
+     function handleSignup() {
 
         const fullname = document.getElementById('fullname').value;
         const email = document.getElementById('email').value;
