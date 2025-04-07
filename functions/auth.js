@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
      function handleSignup() {
-
         const fullname = document.getElementById('fullname').value;
         const email = document.getElementById('email').value;
         const username = document.getElementById('username').value;
@@ -42,10 +41,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert(errorMessage);
             });
     }
-    document.getElementById('signupForm').addEventListener('submit', function (e) {
-        e.preventDefault();
-        handleSignup();
-    });
+
+    // Only add event listener if the signup form exists
+    const signupForm = document.getElementById('signupForm');
+    if (signupForm) {
+        signupForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            handleSignup();
+        });
+    }
 });
 
 document.addEventListener('DOMContentLoaded', function () {

@@ -226,29 +226,42 @@ async function getApproximateLocation(ip) {
     if (ip === 'unknown') return null;
     
     try {
-        const response = await fetch(`https://ipapi.co/${ip}/json/`);
+        // Try ip-api.com first (more reliable free service)
+        const response = await fetch(`http://ip-api.com/json/${ip}`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
         
-        // Handle API error responses
-        if (data.error) {
-            throw new Error(data.reason || 'IP API error');
+        if (data.status === 'success') {
+            return {
+                city: data.city || null,
+                region: data.regionName || null,
+                country: data.country || null
+            };
         }
         
-        return {
-            city: data.city || null,
-            region: data.region || null,
-            country: data.country_name || null
-        };
+        // If ip-api.com fails, try ipapi.co as fallback
+        const fallbackResponse = await fetch(`https://ipapi.co/${ip}/json/`);
+        if (!fallbackResponse.ok) {
+            throw new Error(`Fallback HTTP error! status: ${fallbackResponse.status}`);
+        }
+        const fallbackData = await fallbackResponse.json();
+        
+        if (!fallbackData.error) {
+            return {
+                city: fallbackData.city || null,
+                region: fallbackData.region || null,
+                country: fallbackData.country_name || null
+            };
+        }
+        
+        return null;
     } catch (error) {
-        console.error(`Error getting location for IP ${ip}:`, error);
-        throw error; // Re-throw to be handled by caller
+        console.warn(`IP geolocation failed for IP ${ip}:`, error);
+        return null;
     }
 }
-
-
 
 async function checkAndEnforceLimits(userId, currentTimestamp) {
     try {
@@ -276,7 +289,14 @@ async function checkAndEnforceLimits(userId, currentTimestamp) {
 async function suspendUser(userId, suspendedUntil) {
     try {
         const ipAddress = await getClientIP();
-        const location = await getApproximateLocation(ipAddress);
+        let location = null;
+        
+        try {
+            location = await getApproximateLocation(ipAddress);
+        } catch (locationError) {
+            console.warn('Failed to get location data:', locationError);
+            // Continue with suspension even if location lookup fails
+        }
         
         const suspensionData = {
             suspendedUntil: suspendedUntil,
@@ -286,21 +306,23 @@ async function suspendUser(userId, suspendedUntil) {
             location: location,
             deviceInfo: {
                 userAgent: navigator.userAgent,
-                screenResolution: `${window.screen.width}x${window.screen.height}`
+                platform: navigator.platform,
+                language: navigator.language
             }
         };
-
-        await Promise.all([
-            firebase.database().ref(`users/${userId}/suspension`).set(suspensionData),
-            firebase.database().ref(`suspensions/${userId}_${Date.now()}`).set(suspensionData)
-        ]);
-            
-        localStorage.setItem('suspendedUntil', suspendedUntil);
-        alert("You have exceeded the tab switching limit. Your access has been suspended for 1 hour.");
-        await firebase.auth().signOut();
-        redirectToLogin();
+        
+        await firebase.database().ref(`suspensions/${userId}`).set(suspensionData);
+        console.log(`User ${userId} suspended until ${new Date(suspendedUntil)}`);
     } catch (error) {
         console.error("Error suspending user:", error);
+        // Still proceed with suspension even if location data fails
+        const basicSuspensionData = {
+            suspendedUntil: suspendedUntil,
+            reason: "Excessive tab switching",
+            timestamp: Date.now(),
+            ipAddress: await getClientIP()
+        };
+        await firebase.database().ref(`suspensions/${userId}`).set(basicSuspensionData);
     }
 }
 
