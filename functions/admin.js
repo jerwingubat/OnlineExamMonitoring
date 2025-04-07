@@ -116,41 +116,6 @@ async function openIPModal(userId) {
         `;
     }
 }
-//reserved lang for IP Modal
-/*document.getElementById('view-ip-btn').addEventListener('click', function () {
-    try {
-        const ipDetails = JSON.parse(document.getElementById('modalIpDetails').value);
-        const tbody = document.getElementById('ipTableBody');
-        tbody.innerHTML = '';
-
-        if (typeof ipDetails === 'string') {
-            tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">${ipDetails}</td></tr>`;
-            return;
-        }
-
-        ipDetails.forEach(ipInfo => {
-            const row = document.createElement('tr');
-
-            const locationText = ipInfo.location ?
-                `${ipInfo.location.city || 'Unknown'}, ${ipInfo.location.region || 'Unknown'}, ${ipInfo.location.country || 'Unknown'}` :
-                'Location unknown';
-
-            row.innerHTML = `
-                <td>${ipInfo.ip}</td>
-                <td class="ip-location-cell" title="${locationText}">${locationText}</td>
-                <td>${ipInfo.lastUsed ? formatDate(ipInfo.lastUsed) : 'Never'}</td>
-                <td>${ipInfo.usageCount || 0}</td>
-            `;
-
-            tbody.appendChild(row);
-        });
-
-    } catch (error) {
-        console.error("Error displaying IP information:", error);
-        document.getElementById('ipTableBody').innerHTML =
-            `<tr><td colspan="4" class="text-center text-danger">Error displaying IP information</td></tr>`;
-    }
-});*/
 
 
 
