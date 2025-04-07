@@ -21,6 +21,121 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
+
+async function openIPModal(userId) {
+    try {
+        // Show loading state
+        document.getElementById('ipTableBody').innerHTML = '<tr><td colspan="5" class="text-center">Loading IP data...</td></tr>';
+
+        // Initialize modal FIRST
+        const ipModal = new bootstrap.Modal(document.getElementById('ipModal'));
+        ipModal.show();
+
+        // Then load and render data
+        const ipDetails = await loadIPInformation(userId);
+        renderIPTable(ipDetails);
+
+    } catch (error) {
+        console.error("Error in openIPModal:", error);
+        document.getElementById('ipTableBody').innerHTML = `
+            <tr><td colspan="5" class="text-center text-danger">Error: ${error.message}</td></tr>
+        `;
+    }
+}
+
+document.addEventListener('click', function (e) {
+    if (e.target.closest('.view-ip-btn')) {
+        const userId = e.target.closest('.view-ip-btn').getAttribute('data-userid');
+        openIPModal(userId);
+    }
+});
+
+
+function renderIPTable(ipDetails) {
+    const tbody = document.getElementById('ipTableBody');
+    tbody.innerHTML = '';
+
+    if (ipDetails && ipDetails.length > 0) {
+        ipDetails.forEach(ip => {
+            const locationText = ip.location ?
+                `${ip.location.city || ''}, ${ip.location.country || ''}`.replace(/, $/, '') :
+                'Unknown';
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${ip.ip || 'N/A'}</td>
+                <td>${locationText}</td>
+                <td>${ip.lastUsed ? new Date(ip.lastUsed).toLocaleString() : 'Never'}</td>
+                <td>${ip.usageCount || 0}</td>
+                <td>${ip.source || 'Unknown'}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    } else {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No IP data available</td></tr>';
+    }
+}
+
+async function openIPModal(userId) {
+    try {
+        // Show loading state immediately
+        const ipTableBody = document.getElementById('ipTableBody');
+        ipTableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading IP data...</td></tr>';
+
+        const ipModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('ipModal'));
+        ipModal.show();
+
+        const ipDetails = await loadIPInformation(userId);
+
+        renderIPTable(ipDetails);
+
+        document.getElementById('modalIpDetails').value = JSON.stringify(ipDetails, null, 2);
+
+    } catch (error) {
+        console.error("Error in openIPModal:", error);
+        document.getElementById('ipTableBody').innerHTML = `
+            <tr><td colspan="5" class="text-center text-danger">Error: ${error.message}</td></tr>
+        `;
+    }
+}
+//reserved lang for IP Modal
+/*document.getElementById('view-ip-btn').addEventListener('click', function () {
+    try {
+        const ipDetails = JSON.parse(document.getElementById('modalIpDetails').value);
+        const tbody = document.getElementById('ipTableBody');
+        tbody.innerHTML = '';
+
+        if (typeof ipDetails === 'string') {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">${ipDetails}</td></tr>`;
+            return;
+        }
+
+        ipDetails.forEach(ipInfo => {
+            const row = document.createElement('tr');
+
+            const locationText = ipInfo.location ?
+                `${ipInfo.location.city || 'Unknown'}, ${ipInfo.location.region || 'Unknown'}, ${ipInfo.location.country || 'Unknown'}` :
+                'Location unknown';
+
+            row.innerHTML = `
+                <td>${ipInfo.ip}</td>
+                <td class="ip-location-cell" title="${locationText}">${locationText}</td>
+                <td>${ipInfo.lastUsed ? formatDate(ipInfo.lastUsed) : 'Never'}</td>
+                <td>${ipInfo.usageCount || 0}</td>
+            `;
+
+            tbody.appendChild(row);
+        });
+
+    } catch (error) {
+        console.error("Error displaying IP information:", error);
+        document.getElementById('ipTableBody').innerHTML =
+            `<tr><td colspan="4" class="text-center text-danger">Error displaying IP information</td></tr>`;
+    }
+});*/
+
+
+
 function initializeDataTable() {
     usersTable = $('#users-table').DataTable({
         responsive: true,
@@ -31,9 +146,9 @@ function initializeDataTable() {
             { data: 'role' },
             { data: 'status' },
             { data: 'lastActive' },
-            { 
+            {
                 data: 'tabSwitches',
-                render: function(data, type, row) {
+                render: function (data, type, row) {
                     return data ? `<span class="badge bg-info">${data} tab switches</span>` : '<span class="text-muted">N/A</span>';
                 }
             },
@@ -68,10 +183,10 @@ async function deleteAllUsersSecurityLogs() {
         const updates = {};
         const now = Date.now();
         const adminId = firebase.auth().currentUser.uid;
-        
+
         usersSnapshot.forEach(userSnapshot => {
             const userId = userSnapshot.key;
-            
+
             // Record deletion action before deleting
             /*updates[`users/${userId}/securityLogs/deletion_${now}`] = {
                 eventType: "admin_action",
@@ -80,7 +195,7 @@ async function deleteAllUsersSecurityLogs() {
                 adminId: adminId,
                 ipAddress: await getIPAddress()
             };*/
-            
+
             if (userSnapshot.child('securityLogs').exists()) {
                 Object.keys(userSnapshot.child('securityLogs').val()).forEach(logId => {
                     if (!logId.startsWith('deletion_')) {
@@ -96,10 +211,10 @@ async function deleteAllUsersSecurityLogs() {
             user.securityLogs = {};
             if (user.tabSwitches) user.tabSwitches = 0;
         });
-        
+
         populateDataTable();
         showAlert("All security logs have been deleted", "success");
-        
+
     } catch (error) {
         console.error("Error deleting all security logs:", error);
         showAlert("Failed to delete all security logs", "danger");
@@ -110,7 +225,7 @@ async function deleteAllUsersSecurityLogs() {
 async function deleteAllSecurityLogs() {
     const userId = document.getElementById('modalUserId').value;
     const user = allUsers.find(u => u.id === userId);
-    
+
     if (!userId || !user) {
         showAlert("No user selected", "warning");
         return;
@@ -129,13 +244,12 @@ async function deleteAllSecurityLogs() {
             user.securityLogs = {};
             user.tabSwitches = 0;
         }
-y
-        document.getElementById('securityLogsContainer').innerHTML = 
+        document.getElementById('securityLogsContainer').innerHTML =
             '<p class="text-muted">No security logs found.</p>';
-        
+
         showAlert("All security logs have been deleted", "success");
         populateDataTable();
-        
+
     } catch (error) {
         console.error("Error deleting security logs:", error);
         showAlert("Failed to delete security logs", "danger");
@@ -163,7 +277,7 @@ function initializeAdminPanel() {
     document.getElementById('delete-logs-btn').addEventListener('click', deleteAllSecurityLogs);
     document.getElementById('delete-all-logs-btn').addEventListener('click', deleteAllUsersSecurityLogs);
 
-    $(document).on('click', '.tab-switch-count', function() {
+    $(document).on('click', '.tab-switch-count', function () {
         const userId = $(this).closest('tr').find('.edit-user-btn').data('userid');
         if (userId) {
             openUserModal(userId);
@@ -174,7 +288,7 @@ function initializeAdminPanel() {
             }, 300);
         }
     });
-    
+
 }
 
 async function loadAllUsers() {
@@ -182,7 +296,7 @@ async function loadAllUsers() {
         showLoading(true, "Loading users...");
         const snapshot = await firebase.database().ref('users').once('value');
         allUsers = [];
-        
+
         snapshot.forEach(userSnapshot => {
             const user = userSnapshot.val();
             user.id = userSnapshot.key;
@@ -194,7 +308,7 @@ async function loadAllUsers() {
             } else {
                 user.tabSwitches = 0;
             }
-            
+
             allUsers.push(user);
         });
 
@@ -303,18 +417,18 @@ function filterUsers() {
 
 async function loadSecurityLogs(userId) {
     console.log(`[DEBUG] Attempting to load security logs for user: ${userId}`);
-    
+
     try {
         const logsRef = firebase.database().ref(`users/${userId}/securityLogs`);
         const snapshot = await logsRef.once('value');
-        
+
         console.log('[DEBUG] Raw Firebase snapshot:', snapshot);
         console.log('[DEBUG] Snapshot exists:', snapshot.exists());
         console.log('[DEBUG] Snapshot value:', snapshot.val());
 
         if (!snapshot.exists()) {
             console.log('[DEBUG] No security logs found in database');
-            document.getElementById('securityLogsContainer').innerHTML = 
+            document.getElementById('securityLogsContainer').innerHTML =
                 '<p class="text-muted">No security logs found</p>';
             return;
         }
@@ -335,14 +449,14 @@ async function loadSecurityLogs(userId) {
         });
 
         logs.sort((a, b) => b.timestamp - a.timestamp);
-        
+
         console.log('[DEBUG] Processed logs (sorted):', logs);
 
         renderLogs(logs);
-        
+
     } catch (error) {
         console.error('[ERROR] Failed to load security logs:', error);
-        document.getElementById('securityLogsContainer').innerHTML = 
+        document.getElementById('securityLogsContainer').innerHTML =
             `<p class="text-danger">Error loading logs: ${error.message}</p>`;
     }
 }
@@ -350,7 +464,7 @@ async function loadSecurityLogs(userId) {
 function renderLogs(logs) {
     const container = document.getElementById('securityLogsContainer');
     container.innerHTML = '';
-    
+
     if (logs.length === 0) {
         container.innerHTML = '<p class="text-muted">No valid log entries found</p>';
         return;
@@ -358,14 +472,14 @@ function renderLogs(logs) {
 
     const logsList = document.createElement('div');
     logsList.className = 'list-group';
-    
+
     logs.forEach(log => {
         const logItem = document.createElement('div');
         logItem.className = 'list-group-item';
-        
+
         const logDate = new Date(log.timestamp).toLocaleString();
         const eventType = log.eventType || 'unknown';
-        
+
         logItem.innerHTML = `
             <div class="d-flex w-100 justify-content-between">
                 <h6 class="mb-1 text-capitalize">${eventType.replace(/_/g, ' ')}</h6>
@@ -374,10 +488,10 @@ function renderLogs(logs) {
             ${log.userAgent ? `<small class="text-muted d-block">${log.userAgent.split(' ')[0]}</small>` : ''}
             ${log.screenResolution ? `<small class="text-muted">Resolution: ${log.screenResolution}</small>` : ''}
         `;
-        
+
         logsList.appendChild(logItem);
     });
-    
+
     container.appendChild(logsList);
 }
 async function recordAdminAction(adminId, userId, actionType, details) {
@@ -395,10 +509,12 @@ async function recordAdminAction(adminId, userId, actionType, details) {
 
     await firebase.database().ref(`users/${userId}/securityLogs`).push(logEntry);
 }
+
+
 async function openUserModal(userId) {
     try {
         showLoading(true, "Loading user data...");
-        
+
         const user = allUsers.find(u => u.id === userId);
         if (!user) {
             showAlert("User not found", "danger");
@@ -421,7 +537,7 @@ async function openUserModal(userId) {
         if (isSuspended) {
             document.getElementById('modalSuspensionReason').value = user.suspension.reason || '';
         }
-
+        await loadIPInformation(userId);
         await loadSecurityLogs(userId);
 
         userModal.show();
@@ -431,6 +547,164 @@ async function openUserModal(userId) {
     } finally {
         showLoading(false);
     }
+}
+
+async function loadIPInformation(userId) {
+    try {
+        console.log(`Loading IP info for user: ${userId}`); // Debug log
+
+        const userSnapshot = await firebase.database().ref(`users/${userId}`).once('value');
+        const userData = userSnapshot.val();
+        console.log('User data:', userData); // Debug log
+
+        if (!userData) {
+            console.log('No user data found'); // Debug log
+            return [];
+        }
+
+        const ipDetails = [];
+        const ipMap = new Map();
+
+        // Check and add lastKnownIP if exists
+        if (userData.lastKnownIP && userData.lastKnownIP.ip) {
+            console.log('Found lastKnownIP:', userData.lastKnownIP); // Debug log
+            ipMap.set(userData.lastKnownIP.ip, {
+                count: 1,
+                lastUsed: userData.lastKnownIP.timestamp || Date.now(),
+                source: 'lastKnownIP'
+            });
+        }
+
+        // Process security logs if they exist
+        if (userData.securityLogs) {
+            console.log('Processing security logs...'); // Debug log
+            Object.entries(userData.securityLogs).forEach(([logId, log]) => {
+                if (log.ipAddress && log.ipAddress !== 'unknown') {
+                    console.log(`Found IP in log ${logId}:`, log.ipAddress); // Debug log
+                    const ip = log.ipAddress;
+                    const timestamp = log.timestamp || 0;
+
+                    if (!ipMap.has(ip)) {
+                        ipMap.set(ip, {
+                            count: 0,
+                            lastUsed: 0,
+                            source: 'securityLogs'
+                        });
+                    }
+
+                    const ipInfo = ipMap.get(ip);
+                    ipInfo.count++;
+                    if (timestamp > ipInfo.lastUsed) {
+                        ipInfo.lastUsed = timestamp;
+                    }
+                }
+            });
+        }
+
+        console.log('IP map:', ipMap); // Debug log
+
+        // Process each unique IP
+        for (const [ip, info] of ipMap) {
+            try {
+                console.log(`Getting location for IP: ${ip}`); // Debug log
+                const location = await getApproximateLocation(ip);
+                ipDetails.push({
+                    ip,
+                    location,
+                    lastUsed: info.lastUsed,
+                    usageCount: info.count,
+                    source: info.source
+                });
+            } catch (error) {
+                console.error(`Error processing IP ${ip}:`, error);
+                ipDetails.push({
+                    ip,
+                    error: error.message,
+                    lastUsed: info.lastUsed,
+                    usageCount: info.count,
+                    source: info.source
+                });
+            }
+        }
+
+        console.log('Final IP details:', ipDetails); // Debug log
+        return ipDetails;
+
+    } catch (error) {
+        console.error("Error loading IP information:", error);
+        throw error;
+    }
+}
+
+async function getApproximateLocation(ip) {
+    if (ip === 'unknown') return null;
+
+    try {
+        const response = await fetch(`https://ipapi.co/${ip}/json/`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+
+        // Handle API error responses
+        if (data.error) {
+            throw new Error(data.reason || 'IP API error');
+        }
+
+        return {
+            city: data.city || null,
+            region: data.region || null,
+            country: data.country_name || null
+        };
+    } catch (error) {
+        console.error(`Error getting location for IP ${ip}:`, error);
+        throw error; // Re-throw to be handled by caller
+    }
+}
+
+async function getLastUsedTimestamp(userId, ip) {
+    try {
+        const snapshot = await firebase.database().ref(`users/${userId}/securityLogs`)
+            .orderByChild('ipAddress')
+            .equalTo(ip)
+            .once('value');
+
+        let lastUsed = 0;
+        if (snapshot.exists()) {
+            snapshot.forEach(log => {
+                if (log.val().timestamp > lastUsed) {
+                    lastUsed = log.val().timestamp;
+                }
+            });
+        }
+        return lastUsed;
+    } catch (error) {
+        console.error(`Error getting last used timestamp for IP ${ip}:`, error);
+        return 0;
+    }
+}
+
+async function getIPUsageCount(userId, ip) {
+    try {
+        const snapshot = await firebase.database().ref(`users/${userId}/securityLogs`)
+            .orderByChild('ipAddress')
+            .equalTo(ip)
+            .once('value');
+
+        return snapshot.exists() ? snapshot.numChildren() : 0;
+    } catch (error) {
+        console.error(`Error getting usage count for IP ${ip}:`, error);
+        return 0;
+    }
+}
+
+async function getIPUsageCount(userId, ip) {
+    const snapshot = await firebase.database().ref(`users/${userId}/securityLogs`)
+        .orderByChild('ipAddress')
+        .equalTo(ip)
+        .once('value');
+
+    return snapshot.exists() ? snapshot.numChildren() : 0;
 }
 
 function toggleSuspensionFields() {
@@ -519,7 +793,7 @@ async function resetUserPassword() {
         showAlert(`Password reset email sent to ${user.email}`, "success");
 
         //in a real implementation:
-        // await firebase.auth().sendPasswordResetEmail(user.email);
+        await firebase.auth().sendPasswordResetEmail(user.email);
     } catch (error) {
         console.error("Error resetting password:", error);
         showAlert("Failed to send reset email", "danger");
@@ -599,3 +873,4 @@ function logoutAdmin() {
         showAlert("Failed to logout", "danger");
     });
 }
+

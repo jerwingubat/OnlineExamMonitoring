@@ -4,7 +4,7 @@ let fullscreenAttempts = 0;
 const MAX_FULLSCREEN_ATTEMPTS = 5;
 let tabSwitchDetected = false;
 
-document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', async function () {
 
     const suspendedUntil = localStorage.getItem('suspendedUntil');
     if (suspendedUntil && Date.now() < parseInt(suspendedUntil)) {
@@ -12,14 +12,15 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
     }
 
-    firebase.auth().onAuthStateChanged(async function(user) {
+    firebase.auth().onAuthStateChanged(async function (user) {
         if (user) {
             const suspensionStatus = await checkSuspensionStatus(user.uid);
             if (suspensionStatus && suspensionStatus.suspendedUntil > Date.now()) {
                 await handleSuspension(user.uid, suspensionStatus.suspendedUntil);
                 return;
             }
-            
+
+            await storeInitialIP(user.uid);
             displayUserInfo(user.uid);
             initializeMonitoring(user.uid);
         } else {
@@ -27,18 +28,52 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     });
 });
+
+async function getClientIP() {
+    try {
+        const response = await fetch('https://api.ipify.org?format=json');
+        const data = await response.json();
+        return data.ip || 'unknown';
+    } catch (error) {
+        console.error("Error fetching IP:", error);
+        return 'unknown';
+    }
+}
+
+async function storeInitialIP(userId) {
+    try {
+        const ip = await getClientIP();
+        await firebase.database().ref(`users/${userId}/lastKnownIP`).set({
+            ip: ip,
+            timestamp: Date.now()
+        });
+    } catch (error) {
+        console.error("Error storing IP:", error);
+    }
+}
 function handleSuspendedAccess(suspendedUntil) {
     const remainingTime = Math.ceil((suspendedUntil - Date.now()) / (1000 * 60));
     alert(`Your access is suspended. Please try again in ${remainingTime} minutes.`);
     redirectToLogin();
 }
 
-async function handleSuspension(userId, suspendedUntil) {
-    //save time to local storage to prevent accessing the page during suspension
+async function handleSuspension(userId, suspendedUntil, suspensionData) {
+
     localStorage.setItem('suspendedUntil', suspendedUntil);
     
     const remainingTime = Math.ceil((suspendedUntil - Date.now()) / (1000 * 60));
-    alert(`You've been suspended for 1 hour (${remainingTime} minutes remaining). Please try again later.`);
+    let message = `You've been suspended for 1 hour (${remainingTime} minutes remaining).`;
+    
+    if (suspensionData?.ipAddress) {
+        message += `\n\nSuspension details:\n`;
+        message += `- IP Address: ${suspensionData.ipAddress}\n`;
+        if (suspensionData.location) {
+            message += `- Approximate Location: ${suspensionData.location.city}, ${suspensionData.location.region}, ${suspensionData.location.country}\n`;
+        }
+        message += `- Device: ${suspensionData.deviceInfo?.userAgent || 'Unknown'}`;
+    }
+    
+    alert(message);
     
     try {
         await firebase.auth().signOut();
@@ -65,7 +100,7 @@ function displayUserInfo(userId) {
         console.error("Error fetching user data:", error);
     });
 
-    document.getElementById('logout-btn').addEventListener('click', async function() {
+    document.getElementById('logout-btn').addEventListener('click', async function () {
         const userResponse = confirm("Do you want to logout?");
         if (userResponse) {
             try {
@@ -77,12 +112,13 @@ function displayUserInfo(userId) {
         }
     });
 }
-function initializeMonitoring(userId) {
+async function initializeMonitoring(userId) {
+    await logSecurityEvent(userId, "session_start");
     document.addEventListener("contextmenu", (e) => e.preventDefault());
 
     document.addEventListener("keydown", (e) => {
-        if (e.key === 'F11' || e.key === 'Escape' || 
-            (e.ctrlKey && (e.key === 't' || e.key === 'w' || e.key === 'n' || e.key === 'c' || e.key === 'v')) || 
+        if (e.key === 'F11' || e.key === 'Escape' ||
+            (e.ctrlKey && (e.key === 't' || e.key === 'w' || e.key === 'n' || e.key === 'c' || e.key === 'v')) ||
             (e.altKey && e.key === 'Tab')) {
             e.preventDefault();
             logSecurityEvent(userId, "keyboard_shortcut_attempt", e.key);
@@ -160,12 +196,16 @@ async function logSecurityEvent(userId, eventType, additionalData = null) {
     if (!userId) return;
     
     const timestamp = Date.now();
+    const ipAddress = await getClientIP();
+    
     const logData = {
         eventType: eventType,
         timestamp: timestamp,
         userAgent: navigator.userAgent,
         screenResolution: `${window.screen.width}x${window.screen.height}`,
-        fullscreen: !!document.fullscreenElement
+        fullscreen: !!document.fullscreenElement,
+        ipAddress: ipAddress,
+        location: await getApproximateLocation(ipAddress)
     };
 
     if (additionalData) {
@@ -182,6 +222,33 @@ async function logSecurityEvent(userId, eventType, additionalData = null) {
         console.error("Error saving security log:", error);
     }
 }
+async function getApproximateLocation(ip) {
+    if (ip === 'unknown') return null;
+    
+    try {
+        const response = await fetch(`https://ipapi.co/${ip}/json/`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        
+        // Handle API error responses
+        if (data.error) {
+            throw new Error(data.reason || 'IP API error');
+        }
+        
+        return {
+            city: data.city || null,
+            region: data.region || null,
+            country: data.country_name || null
+        };
+    } catch (error) {
+        console.error(`Error getting location for IP ${ip}:`, error);
+        throw error; // Re-throw to be handled by caller
+    }
+}
+
+
 
 async function checkAndEnforceLimits(userId, currentTimestamp) {
     try {
@@ -189,7 +256,7 @@ async function checkAndEnforceLimits(userId, currentTimestamp) {
             .orderByChild('timestamp')
             .startAt(currentTimestamp - SUSPENSION_DURATION_MS)
             .once('value');
-        
+
         let violationCount = 0;
         snapshot.forEach(log => {
             if (log.val().eventType === 'tab_switch_detected') {
@@ -208,15 +275,27 @@ async function checkAndEnforceLimits(userId, currentTimestamp) {
 
 async function suspendUser(userId, suspendedUntil) {
     try {
-
-        await firebase.database().ref(`users/${userId}/suspension`).set({
+        const ipAddress = await getClientIP();
+        const location = await getApproximateLocation(ipAddress);
+        
+        const suspensionData = {
             suspendedUntil: suspendedUntil,
             reason: "Excessive tab switching",
-            timestamp: Date.now()
-        });
+            timestamp: Date.now(),
+            ipAddress: ipAddress,
+            location: location,
+            deviceInfo: {
+                userAgent: navigator.userAgent,
+                screenResolution: `${window.screen.width}x${window.screen.height}`
+            }
+        };
+
+        await Promise.all([
+            firebase.database().ref(`users/${userId}/suspension`).set(suspensionData),
+            firebase.database().ref(`suspensions/${userId}_${Date.now()}`).set(suspensionData)
+        ]);
             
         localStorage.setItem('suspendedUntil', suspendedUntil);
-
         alert("You have exceeded the tab switching limit. Your access has been suspended for 1 hour.");
         await firebase.auth().signOut();
         redirectToLogin();
@@ -231,9 +310,13 @@ async function checkSuspensionStatus(userId) {
         const suspension = snapshot.val();
         
         if (suspension && suspension.suspendedUntil > Date.now()) {
+            const currentIP = await getClientIP();
             return {
                 suspendedUntil: suspension.suspendedUntil,
-                reason: suspension.reason
+                reason: suspension.reason,
+                originalIP: suspension.ipAddress,
+                currentIP: currentIP,
+                isSameIP: suspension.ipAddress === currentIP
             };
         }
         return null;
@@ -243,7 +326,7 @@ async function checkSuspensionStatus(userId) {
     }
 }
 
-window.addEventListener('load', function() {
+window.addEventListener('load', function () {
     const suspendedUntil = localStorage.getItem('suspendedUntil');
     if (suspendedUntil && Date.now() > parseInt(suspendedUntil)) {
         localStorage.removeItem('suspendedUntil');
