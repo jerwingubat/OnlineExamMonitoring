@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
         } else {
-            window.location.href = "/index.html";
+            window.location.href = "/public/index.html";
         }
     });
 });
@@ -856,7 +856,7 @@ function showLoading(show, message = "Loading...") {
 
 function logoutAdmin() {
     firebase.auth().signOut().then(() => {
-        window.location.href = '/index.html';
+        window.location.href = '/public/index.html';
     }).catch(error => {
         console.error("Logout error:", error);
         showAlert("Failed to logout", "danger");

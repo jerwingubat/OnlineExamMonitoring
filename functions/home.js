@@ -84,7 +84,7 @@ async function handleSuspension(userId, suspendedUntil, suspensionData) {
 }
 
 function redirectToLogin() {
-    window.location.href = '/index.html';
+    window.location.href = '/publc/index.html';
 }
 
 function displayUserInfo(userId) {
