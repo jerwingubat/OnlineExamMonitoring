@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "exammonitoring-e67dd-8e32b",
     "public": "public",
     "ignore": [
       "firebase.json",
@@ -11,3 +12,4 @@
     "rules": "database.rules.json"
   }
 }
+
