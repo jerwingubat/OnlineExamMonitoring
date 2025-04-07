@@ -6,6 +6,39 @@
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/public/home.html",
+        "destination": "/home.html"
+      },
+      {
+        "source": "/public/admin.html",
+        "destination": "/admin.html"
+      },
+      {
+        "source": "/public/**",
+        "destination": "/:1"
+      },
+      {
+        "source": "/admin",
+        "destination": "/admin.html"
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**/*.js",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/javascript"
+          }
+        ]
+      }
     ]
   },
   "database": {
