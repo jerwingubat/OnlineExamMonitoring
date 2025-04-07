@@ -90,7 +90,7 @@ function handleLogin() {
                     if (userData && userData.isAdmin) {
                         window.location.href = "/public/admin.html";
                     } else {
-                        window.location.href = `/home.html?uid=${user.uid}`;
+                        window.location.href = `/public/home.html?uid=${user.uid}`;
                     }
                 });
         })
