@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .then(() => {
                 alert("Account created successfully!");
-                window.location.href = "/public/index.html";
+                window.location.href = "/index.html";
             })
             .catch((error) => {
                 const errorCode = error.code;
@@ -88,7 +88,7 @@ function handleLogin() {
                 .then((snapshot) => {
                     const userData = snapshot.val();
                     if (userData && userData.isAdmin) {
-                        window.location.href = "/public/admin.html";
+                        window.location.href = "/admin.html";
                     } else {
                         window.location.href = `/home.html?uid=${user.uid}`;
                     }
