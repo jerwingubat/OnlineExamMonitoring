@@ -26,15 +26,14 @@ async function openIPModal(userId) {
     try {
         // Show loading state
         document.getElementById('ipTableBody').innerHTML = '<tr><td colspan="5" class="text-center">Loading IP data...</td></tr>';
-
-        // Initialize modal FIRST
+        
+        // Initialize modal
         const ipModal = new bootstrap.Modal(document.getElementById('ipModal'));
         ipModal.show();
 
-        // Then load and render data
+        // Load and render IP data
         const ipDetails = await loadIPInformation(userId);
         renderIPTable(ipDetails);
-
     } catch (error) {
         console.error("Error in openIPModal:", error);
         document.getElementById('ipTableBody').innerHTML = `
@@ -53,32 +52,54 @@ document.addEventListener('click', function (e) {
 
 function renderIPTable(ipDetails) {
     const tbody = document.getElementById('ipTableBody');
+    if (!tbody) return;
+    
     tbody.innerHTML = '';
 
     if (ipDetails && ipDetails.length > 0) {
         ipDetails.forEach(ip => {
-            const locationText = ip.location ?
-                `${ip.location.city || ''}, ${ip.location.country || ''}`.replace(/, $/, '') :
-                'Unknown';
+            let locationText = 'Unknown';
+            if (ip.location) {
+                locationText = `${ip.location.city}, ${ip.location.region}, ${ip.location.country}`;
+            }
 
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${ip.ip || 'N/A'}</td>
-                <td>${locationText}</td>
-                <td>${ip.lastUsed ? new Date(ip.lastUsed).toLocaleString() : 'Never'}</td>
-                <td>${ip.usageCount || 0}</td>
-                <td>${ip.source || 'Unknown'}</td>
+                <td class="border px-3 py-2">${ip.ip || 'N/A'}</td>
+                <td class="border px-3 py-2">${locationText}</td>
+                <td class="border px-3 py-2">${ip.timestamp ? new Date(ip.timestamp).toLocaleString() : 'Unknown'}</td>
+                <td class="border px-3 py-2">${ip.usageCount || 'N/A'}</td>
+                <td class="border px-3 py-2">${ip.source || 'System'}</td>
             `;
             tbody.appendChild(row);
         });
     } else {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No IP data available</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted border px-3 py-2">No IP data available</td></tr>';
     }
+    
+    const modalIpDetails = document.getElementById('modalIpDetails');
+    if (modalIpDetails) {
+        modalIpDetails.value = JSON.stringify(ipDetails, null, 2);
+    }
+
+    const table = document.getElementById('ipTable');
+    if (table) {
+        table.classList.add('table-bordered', 'w-100');
+    }
+    
+    const modalDialog = document.querySelector('#ipModal .modal-dialog');
+    if (modalDialog) {
+        modalDialog.classList.add('modal-lg');
+    }
+    
+    const headers = table ? table.querySelectorAll('th') : [];
+    headers.forEach(header => {
+        header.classList.add('border', 'bg-light', 'px-3', 'py-2');
+    });
 }
 
 async function openIPModal(userId) {
     try {
-        // Show loading state immediately
         const ipTableBody = document.getElementById('ipTableBody');
         ipTableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading IP data...</td></tr>';
 
@@ -146,12 +167,8 @@ function initializeDataTable() {
             { data: 'role' },
             { data: 'status' },
             { data: 'lastActive' },
-            {
-                data: 'tabSwitches',
-                render: function (data, type, row) {
-                    return data ? `<span class="badge bg-info">${data} tab switches</span>` : '<span class="text-muted">N/A</span>';
-                }
-            },
+            { data: 'tabSwitches' },
+            { data: 'ipInfo' },
             { data: 'actions', orderable: false }
         ],
         language: {
@@ -172,12 +189,12 @@ async function checkAdminStatus(userId) {
 }
 
 async function deleteAllUsersSecurityLogs() {
-    if (!confirm("WARNING: This will delete ALL security logs for ALL users. This action cannot be undone. Continue?")) {
+    if (!confirm("WARNING: This will delete ALL security logs, IP information, and location data for ALL users. This action cannot be undone. Continue?")) {
         return;
     }
 
     try {
-        showLoading(true, "Deleting all security logs...");
+        showLoading(true, "Deleting all security logs and IP information...");
 
         const usersSnapshot = await firebase.database().ref('users').once('value');
         const updates = {};
@@ -187,37 +204,33 @@ async function deleteAllUsersSecurityLogs() {
         usersSnapshot.forEach(userSnapshot => {
             const userId = userSnapshot.key;
 
-            // Record deletion action before deleting
-            /*updates[`users/${userId}/securityLogs/deletion_${now}`] = {
-                eventType: "admin_action",
-                action: "bulk_delete_all_logs",
-                timestamp: now,
-                adminId: adminId,
-                ipAddress: await getIPAddress()
-            };*/
-
-            if (userSnapshot.child('securityLogs').exists()) {
-                Object.keys(userSnapshot.child('securityLogs').val()).forEach(logId => {
-                    if (!logId.startsWith('deletion_')) {
-                        updates[`users/${userId}/securityLogs/${logId}`] = null;
-                    }
-                });
-            }
+            // Delete security logs, IP, and location data
+            updates[`users/${userId}/securityLogs`] = null;
+            updates[`users/${userId}/lastKnownIP`] = null;
+            updates[`users/${userId}/location`] = null;
+            updates[`users/${userId}/suspension`] = null;
         });
 
         await firebase.database().ref().update(updates);
 
+        // Update local data
         allUsers.forEach(user => {
             user.securityLogs = {};
-            if (user.tabSwitches) user.tabSwitches = 0;
+            user.lastKnownIP = null;
+            user.location = null;
+            user.tabSwitches = 0;
+            user.suspension = null;
         });
 
+        // Clear localStorage for all users
+        localStorage.removeItem('suspendedUntil');
+
         populateDataTable();
-        showAlert("All security logs have been deleted", "success");
+        showAlert("All security logs and IP information have been deleted for all users", "success");
 
     } catch (error) {
-        console.error("Error deleting all security logs:", error);
-        showAlert("Failed to delete all security logs", "danger");
+        console.error("Error deleting all security logs and IP information:", error);
+        showAlert("Failed to delete all security logs and IP information", "danger");
     } finally {
         showLoading(false);
     }
@@ -231,28 +244,46 @@ async function deleteAllSecurityLogs() {
         return;
     }
 
-    if (!confirm(`Are you sure you want to delete ALL security logs for ${user.fullname || user.email}? This action cannot be undone.`)) {
+    if (!confirm(`Are you sure you want to delete ALL security logs and IP information for ${user.fullname || user.email}? This action cannot be undone.`)) {
         return;
     }
 
     try {
-        showLoading(true, "Deleting security logs...");
+        showLoading(true, "Deleting security logs and IP information...");
 
-        await firebase.database().ref(`users/${userId}/securityLogs`).remove();
+        const updates = {
+            [`users/${userId}/securityLogs`]: null,
+            [`users/${userId}/lastKnownIP`]: null,
+            [`users/${userId}/location`]: null,
+            [`users/${userId}/suspension`]: null
+        };
 
-        if (user.securityLogs) {
+        await firebase.database().ref().update(updates);
+
+        if (user) {
             user.securityLogs = {};
+            user.lastKnownIP = null;
+            user.location = null;
             user.tabSwitches = 0;
+            user.suspension = null;
         }
+
+        localStorage.removeItem('suspendedUntil');
+
         document.getElementById('securityLogsContainer').innerHTML =
             '<p class="text-muted">No security logs found.</p>';
 
-        showAlert("All security logs have been deleted", "success");
+        const ipTableBody = document.getElementById('ipTableBody');
+        if (ipTableBody) {
+            ipTableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No IP data available</td></tr>';
+        }
+
+        showAlert("All security logs and IP information have been deleted", "success");
         populateDataTable();
 
     } catch (error) {
-        console.error("Error deleting security logs:", error);
-        showAlert("Failed to delete security logs", "danger");
+        console.error("Error deleting security logs and IP information:", error);
+        showAlert("Failed to delete security logs and IP information", "danger");
     } finally {
         showLoading(false);
     }
@@ -343,6 +374,9 @@ function updateStats() {
 function populateDataTable() {
     const now = Date.now();
     const tableData = allUsers.map(user => {
+        const lastKnownIP = user.lastKnownIP?.ip || 'Unknown';
+        const lastIPTimestamp = user.lastKnownIP?.timestamp ? new Date(user.lastKnownIP.timestamp).toLocaleString() : 'Never';
+        
         return {
             name: `
                 <div class="d-flex align-items-center">
@@ -363,6 +397,11 @@ function populateDataTable() {
                 `<span class="last-active">${formatDate(user.lastLogin)}</span>` :
                 'Never',
             tabSwitches: user.tabSwitches || 0,
+            ipInfo: `
+                <button class="btn btn-sm btn-info view-ip-btn" data-userid="${user.id}">
+                    <i class="bi bi-globe"></i> View IP
+                </button>
+            `,
             actions: `
                 <button class="btn btn-sm btn-outline-primary edit-user-btn" data-userid="${user.id}">
                     <i class="bi bi-pencil"></i> Edit
@@ -373,8 +412,15 @@ function populateDataTable() {
 
     usersTable.clear().rows.add(tableData).draw();
 
+    document.querySelectorAll('.view-ip-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const userId = this.getAttribute('data-userid');
+            openIPModal(userId);
+        });
+    });
+
     document.querySelectorAll('.edit-user-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
+        btn.addEventListener('click', function() {
             const userId = this.getAttribute('data-userid');
             openUserModal(userId);
         });
@@ -465,34 +511,80 @@ function renderLogs(logs) {
     const container = document.getElementById('securityLogsContainer');
     container.innerHTML = '';
 
-    if (logs.length === 0) {
-        container.innerHTML = '<p class="text-muted">No valid log entries found</p>';
-        return;
-    }
+    const filterContainer = document.createElement('div');
+    filterContainer.className = 'mb-3';
+    filterContainer.innerHTML = `
+        <div class="d-flex align-items-center gap-2">
+            <label for="logTypeFilter" class="form-label mb-0">Filter by type:</label>
+            <select id="logTypeFilter" class="form-select form-select-sm w-auto">
+                <option value="all">All Activities</option>
+                <option value="session_start">Session Start</option>
+                <option value="keyboard_shortcut_attempt">Keyboard Shortcut Attempt</option>
+                <option value="fullscreen_exited">Fullscreen Exited</option>
+                <option value="tab_hidden">Tab Hidden</option>
+                <option value="window_blur">Window Blur</option>
+                <option value="tab_switch_detected">Tab Switch Detected</option>
+                <option value="login">Login</option>
+                <option value="logout">Logout</option>
+                <option value="admin_action">Admin Actions</option>
+            </select>
+        </div>
+    `;
+    container.appendChild(filterContainer);
 
     const logsList = document.createElement('div');
     logsList.className = 'list-group';
+    logsList.id = 'logsListContainer';
 
-    logs.forEach(log => {
-        const logItem = document.createElement('div');
-        logItem.className = 'list-group-item';
+    function filterAndDisplayLogs(selectedType) {
+        const filteredLogs = selectedType === 'all' 
+            ? logs 
+            : logs.filter(log => log.eventType === selectedType);
 
-        const logDate = new Date(log.timestamp).toLocaleString();
-        const eventType = log.eventType || 'unknown';
+        logsList.innerHTML = '';
 
-        logItem.innerHTML = `
-            <div class="d-flex w-100 justify-content-between">
-                <h6 class="mb-1 text-capitalize">${eventType.replace(/_/g, ' ')}</h6>
-                <small class="text-muted">${logDate}</small>
-            </div>
-            ${log.userAgent ? `<small class="text-muted d-block">${log.userAgent.split(' ')[0]}</small>` : ''}
-            ${log.screenResolution ? `<small class="text-muted">Resolution: ${log.screenResolution}</small>` : ''}
-        `;
+        if (filteredLogs.length === 0) {
+            logsList.innerHTML = '<p class="text-muted p-3">No matching log entries found</p>';
+            return;
+        }
 
-        logsList.appendChild(logItem);
+        filteredLogs.forEach(log => {
+            const logItem = document.createElement('div');
+            logItem.className = 'list-group-item';
+            logItem.setAttribute('data-log-type', log.eventType);
+
+            const logDate = new Date(log.timestamp).toLocaleString();
+            const eventType = log.eventType || 'unknown';
+            
+            // Format the event type for display
+            const formattedEventType = eventType
+                .replace(/_/g, ' ')
+                .split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                .join(' ');
+
+            logItem.innerHTML = `
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">${formattedEventType}</h6>
+                    <small class="text-muted">${logDate}</small>
+                </div>
+                ${log.userAgent ? `<small class="text-muted d-block">${log.userAgent.split(' ')[0]}</small>` : ''}
+                ${log.screenResolution ? `<small class="text-muted">Resolution: ${log.screenResolution}</small>` : ''}
+                ${log.ipAddress ? `<small class="text-muted d-block">IP: ${log.ipAddress}</small>` : ''}
+            `;
+
+            logsList.appendChild(logItem);
+        });
+    }
+
+    const filterSelect = filterContainer.querySelector('#logTypeFilter');
+    filterSelect.addEventListener('change', (e) => {
+        filterAndDisplayLogs(e.target.value);
     });
 
     container.appendChild(logsList);
+    
+    filterAndDisplayLogs('all');
 }
 async function recordAdminAction(adminId, userId, actionType, details) {
     const logEntry = {
@@ -551,87 +643,40 @@ async function openUserModal(userId) {
 
 async function loadIPInformation(userId) {
     try {
-        console.log(`Loading IP info for user: ${userId}`); // Debug log
-
-        const userSnapshot = await firebase.database().ref(`users/${userId}`).once('value');
-        const userData = userSnapshot.val();
-        console.log('User data:', userData); // Debug log
+        const userRef = firebase.database().ref(`users/${userId}`);
+        const snapshot = await userRef.once('value');
+        const userData = snapshot.val();
 
         if (!userData) {
-            console.log('No user data found'); // Debug log
-            return [];
+            throw new Error('User not found');
         }
 
         const ipDetails = [];
-        const ipMap = new Map();
 
-        // Check and add lastKnownIP if exists
-        if (userData.lastKnownIP && userData.lastKnownIP.ip) {
-            console.log('Found lastKnownIP:', userData.lastKnownIP); // Debug log
-            ipMap.set(userData.lastKnownIP.ip, {
-                count: 1,
-                lastUsed: userData.lastKnownIP.timestamp || Date.now(),
-                source: 'lastKnownIP'
+        if (userData.lastKnownIP && userData.securityLogs) {
+            const logs = Object.values(userData.securityLogs);
+            const logWithLocation = logs.find(log => log.location);
+            
+            ipDetails.push({
+                ip: userData.lastKnownIP.ip,
+                location: logWithLocation ? {
+                    city: logWithLocation.location.city || 'Unknown',
+                    region: logWithLocation.location.region || 'Unknown',
+                    country: logWithLocation.location.country || 'Unknown'
+                } : {
+                    city: 'Unknown',
+                    region: 'Unknown',
+                    country: 'Unknown'
+                },
+                timestamp: userData.lastKnownIP.timestamp,
+                usageCount: 1,
+                source: 'Last Known'
             });
         }
 
-        // Process security logs if they exist
-        if (userData.securityLogs) {
-            console.log('Processing security logs...'); // Debug log
-            Object.entries(userData.securityLogs).forEach(([logId, log]) => {
-                if (log.ipAddress && log.ipAddress !== 'unknown') {
-                    console.log(`Found IP in log ${logId}:`, log.ipAddress); // Debug log
-                    const ip = log.ipAddress;
-                    const timestamp = log.timestamp || 0;
-
-                    if (!ipMap.has(ip)) {
-                        ipMap.set(ip, {
-                            count: 0,
-                            lastUsed: 0,
-                            source: 'securityLogs'
-                        });
-                    }
-
-                    const ipInfo = ipMap.get(ip);
-                    ipInfo.count++;
-                    if (timestamp > ipInfo.lastUsed) {
-                        ipInfo.lastUsed = timestamp;
-                    }
-                }
-            });
-        }
-
-        console.log('IP map:', ipMap); // Debug log
-
-        // Process each unique IP
-        for (const [ip, info] of ipMap) {
-            try {
-                console.log(`Getting location for IP: ${ip}`); // Debug log
-                const location = await getApproximateLocation(ip);
-                ipDetails.push({
-                    ip,
-                    location,
-                    lastUsed: info.lastUsed,
-                    usageCount: info.count,
-                    source: info.source
-                });
-            } catch (error) {
-                console.error(`Error processing IP ${ip}:`, error);
-                ipDetails.push({
-                    ip,
-                    error: error.message,
-                    lastUsed: info.lastUsed,
-                    usageCount: info.count,
-                    source: info.source
-                });
-            }
-        }
-
-        console.log('Final IP details:', ipDetails); // Debug log
         return ipDetails;
-
     } catch (error) {
-        console.error("Error loading IP information:", error);
+        console.error('Error loading IP information:', error);
         throw error;
     }
 }
@@ -646,7 +691,6 @@ async function getApproximateLocation(ip) {
         }
         const data = await response.json();
 
-        // Handle API error responses
         if (data.error) {
             throw new Error(data.reason || 'IP API error');
         }
@@ -658,7 +702,7 @@ async function getApproximateLocation(ip) {
         };
     } catch (error) {
         console.error(`Error getting location for IP ${ip}:`, error);
-        throw error; // Re-throw to be handled by caller
+        throw error;
     }
 }
 
@@ -696,15 +740,6 @@ async function getIPUsageCount(userId, ip) {
         console.error(`Error getting usage count for IP ${ip}:`, error);
         return 0;
     }
-}
-
-async function getIPUsageCount(userId, ip) {
-    const snapshot = await firebase.database().ref(`users/${userId}/securityLogs`)
-        .orderByChild('ipAddress')
-        .equalTo(ip)
-        .once('value');
-
-    return snapshot.exists() ? snapshot.numChildren() : 0;
 }
 
 function toggleSuspensionFields() {
@@ -792,7 +827,6 @@ async function resetUserPassword() {
         //This is just a placeholder for the UI flow.
         showAlert(`Password reset email sent to ${user.email}`, "success");
 
-        //in a real implementation:
         await firebase.auth().sendPasswordResetEmail(user.email);
     } catch (error) {
         console.error("Error resetting password:", error);

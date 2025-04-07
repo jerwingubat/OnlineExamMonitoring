@@ -295,7 +295,6 @@ async function suspendUser(userId, suspendedUntil) {
             location = await getApproximateLocation(ipAddress);
         } catch (locationError) {
             console.warn('Failed to get location data:', locationError);
-            // Continue with suspension even if location lookup fails
         }
         
         const suspensionData = {
