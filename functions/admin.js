@@ -24,14 +24,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
 async function openIPModal(userId) {
     try {
-        // Show loading state
         document.getElementById('ipTableBody').innerHTML = '<tr><td colspan="5" class="text-center">Loading IP data...</td></tr>';
-        
-        // Initialize modal
+
         const ipModal = new bootstrap.Modal(document.getElementById('ipModal'));
         ipModal.show();
 
-        // Load and render IP data
         const ipDetails = await loadIPInformation(userId);
         renderIPTable(ipDetails);
     } catch (error) {
@@ -204,7 +201,6 @@ async function deleteAllUsersSecurityLogs() {
         usersSnapshot.forEach(userSnapshot => {
             const userId = userSnapshot.key;
 
-            // Delete security logs, IP, and location data
             updates[`users/${userId}/securityLogs`] = null;
             updates[`users/${userId}/lastKnownIP`] = null;
             updates[`users/${userId}/location`] = null;
@@ -213,7 +209,6 @@ async function deleteAllUsersSecurityLogs() {
 
         await firebase.database().ref().update(updates);
 
-        // Update local data
         allUsers.forEach(user => {
             user.securityLogs = {};
             user.lastKnownIP = null;
@@ -222,7 +217,6 @@ async function deleteAllUsersSecurityLogs() {
             user.suspension = null;
         });
 
-        // Clear localStorage for all users
         localStorage.removeItem('suspendedUntil');
 
         populateDataTable();
@@ -555,8 +549,7 @@ function renderLogs(logs) {
 
             const logDate = new Date(log.timestamp).toLocaleString();
             const eventType = log.eventType || 'unknown';
-            
-            // Format the event type for display
+
             const formattedEventType = eventType
                 .replace(/_/g, ' ')
                 .split(' ')
@@ -822,9 +815,6 @@ async function resetUserPassword() {
 
     try {
         showLoading(true, "Sending password reset email...");
-
-        //need ng Firebase Admin SDK para mag function
-        //This is just a placeholder for the UI flow.
         showAlert(`Password reset email sent to ${user.email}`, "success");
 
         await firebase.auth().sendPasswordResetEmail(user.email);

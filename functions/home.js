@@ -241,7 +241,6 @@ async function getApproximateLocation(ip) {
             };
         }
         
-        // If ip-api.com fails, try ipapi.co as fallback
         const fallbackResponse = await fetch(`https://ipapi.co/${ip}/json/`);
         if (!fallbackResponse.ok) {
             throw new Error(`Fallback HTTP error! status: ${fallbackResponse.status}`);
@@ -314,7 +313,6 @@ async function suspendUser(userId, suspendedUntil) {
         console.log(`User ${userId} suspended until ${new Date(suspendedUntil)}`);
     } catch (error) {
         console.error("Error suspending user:", error);
-        // Still proceed with suspension even if location data fails
         const basicSuspensionData = {
             suspendedUntil: suspendedUntil,
             reason: "Excessive tab switching",

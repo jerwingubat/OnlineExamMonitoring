@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
-    // Only add event listener if the signup form exists
+
     const signupForm = document.getElementById('signupForm');
     if (signupForm) {
         signupForm.addEventListener('submit', function (e) {
