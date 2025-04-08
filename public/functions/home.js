@@ -5,7 +5,6 @@ const MAX_FULLSCREEN_ATTEMPTS = 5;
 let tabSwitchDetected = false;
 
 document.addEventListener('DOMContentLoaded', async function () {
-
     const suspendedUntil = localStorage.getItem('suspendedUntil');
     if (suspendedUntil && Date.now() < parseInt(suspendedUntil)) {
         handleSuspendedAccess(parseInt(suspendedUntil));
@@ -72,7 +71,6 @@ async function handleSuspension(userId, suspendedUntil, suspensionData) {
         }
         message += `- Device: ${suspensionData.deviceInfo?.userAgent || 'Unknown'}`;
     }
-    
     alert(message);
     
     try {
