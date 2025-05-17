@@ -121,12 +121,9 @@ function getFriendlyErrorMessage(errorCode) {
 // Check authentication state
 firebase.auth().onAuthStateChanged(function(user) {
     if (user) {
-        // User is signed in
         console.log('User is signed in:', user.email);
     } else {
-        // No user is signed in
         console.log('No user is signed in');
-        // Redirect to login page if not on login or signup page
         if (!window.location.pathname.includes('index.html') && 
             !window.location.pathname.includes('signup.html')) {
             window.location.href = '/index.html';
@@ -134,13 +131,11 @@ firebase.auth().onAuthStateChanged(function(user) {
     }
 });
 
-// Sign out function
 function signOut() {
     firebase.auth().signOut().then(() => {
-        // Sign-out successful
+
         window.location.href = '/index.html';
     }).catch((error) => {
-        // An error happened
         console.error('Sign out error:', error);
     });
 }
